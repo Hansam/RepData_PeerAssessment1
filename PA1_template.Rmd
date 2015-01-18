@@ -5,21 +5,222 @@ output:
     keep_md: true
 ---
 
+##Loading and preprocessing the data
+- No extra packages loaded, just packages loaded in Rstudio as default used
 
-## Loading and preprocessing the data
+- Set working directory
+```{r}
+setwd("/Users/hss1g09/DataScience/ReproducibleResearch")
+```
+- Make new folder
+```{r}
+if (!file.exists("Assign1")){
+        dir.create("Assign1")
+}
+```
+- Set working directory to new folder
+```{r}
+setwd("/Users/hss1g09/DataScience/ReproducibleResearch/Assign1")
+```
+- define URL of data
+```{r}
+fileURL<-"https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip"
+```
+- download
+```{r}
+download.file(fileURL, destfile="/Users/hss1g09/DataScience/ReproducibleResearch/Assign1/repdata_2Fdata_2Factivity.zip", method="curl")
+```
+- time stamp
+```{r}
+dateDownload<-date()  #records when downloaded
+dateDownload
+```
+- unzip and read data into a table: 'tab'
+```{r}
+data<-unzip("/Users/hss1g09/DataScience/ReproducibleResearch/Assign1/repdata_2Fdata_2Factivity.zip")
+tab<-read.csv(data)
+```
 
+##How does the data look like? (not in assignment)
+```{r}
+head(tab)
+tail(tab)
+str(tab)
+summary(tab)
+```
 
+##Part 1: What is mean total number of steps taken per day?
+###1 - Histogram
+- calculate the steps taken each day
+```{r}
+sum_steps<-tapply(tab$steps,tab$date,sum) 
+```
+- make the histogram of the total number of steps taken each day
+```{r}
+hist(sum_steps, breaks=seq(0,25000,2500), xlim=c(0,25000),ylim=c(0,20), xlab=c("Steps"),
+     ylab=c("Frequency [Days]"), main=c(), plot=TRUE)
+```
 
-## What is mean total number of steps taken per day?
+###2 - Mean and median 
+- both the mean and median can be displayed with summary()
+```{r}
+summary(sum_steps)
+```
 
+##Part 2: What is the average daily activity pattern?
+###1 - Time series plot
+- calculate the mean of each 5-minute interval over all days
+- NA are ignored with na.rm=TRUE
+```{r}
+mean_steps_interval<-tapply(tab$steps,tab$interval,mean, na.rm=TRUE)
+```
+- to plot the data the mean_steps_interval are converted into a data frame: mean_int
+- the data are then plotted using the basic plotting system
+```{r}
+mean_int<-data.frame(mean_steps_interval)
+mean_int$interval<-unique(tab$interval)
 
+head(mean_int) #quick look at the new table
 
-## What is the average daily activity pattern?
+par(mfrow=c(1,1))
+plot(mean_int$mean_steps_interval~mean_int$interval,type="l", xaxt="n", 
+     xlab=c("Time of day [h]"), ylab=c("Number of steps"))
+axis(1, at=c(0, 400, 800, 1200, 1600, 2000,2355),labels=c("00:00","4:00","8:00","12:00",
+                                                    "16:00","20:00","23:55"))
+```
 
+###2 - max steps in 5 min interval
+- calculate the interval with the most steps taken over all days
+```{r}
+max_int<-mean_int[which(mean_int$mean_steps_interval== max(mean_int$mean_steps_interval)),]
+max_int$interval
+```
 
+##Part 3:Imputing missing values
+###1 - Total number of NA
+- calculate the total number of NA for each column: steps, date, interval
+```{r}
+steps_NA<-is.na(tab$steps)
+sum(steps_NA)
+date_NA<-is.na(tab$date)
+sum(date_NA)
+interval_NA<-is.na(tab$interval)
+sum(interval_NA)
+```
 
-## Imputing missing values
+###2 - Fill NA with mean of 5 min interval
+- each NA is replaced with the mean value of the interval over all days and saved as table: new_tab
+- within the for loop the column date is convertic to numeric, thus the a column new_date is inserted to the table new_tab after the for loop
 
+```{r}
+#tab$new_interval<-tab$interval+1
+new_tab<-matrix(data=NA,ncol=dim(tab)[2],nrow=dim(tab)[1])
+colnames(new_tab)<-names(tab)
+counter<-1
+int<-seq(0,2355,5)
+for (i in int){
+        
+        Loop_interval<-tab[which(tab$interval==i),]
+        mean_steps<-mean(Loop_interval$steps,na.rm=TRUE)
+        
+        
+        for (d in Loop_interval$date){
+                
+                Loop_date<-Loop_interval[which(Loop_interval$date==d),]
+                
+                if(is.na(Loop_date$steps)==TRUE) 
+                        {new_tab[counter, 1]<-mean_steps
+                }else{
+                        new_tab[counter,1]<-Loop_date$steps}
+                       
+              
+                new_tab[counter,2]<-Loop_date$date
+                new_tab[counter,3]<-i
+               
+                
+                counter<-counter +1   
+        }
+       
+}
+```
 
+- convert matrix to data.frame
+```{r}
+new_tab_df<-data.frame(new_tab)
+```
+- differently sorted version of the original table in oder of the intervals to match new_tab order
+```{r}
+tab_interval_sorted<-tab[order(tab$interval),]
+```
 
-## Are there differences in activity patterns between weekdays and weekends?
+###3 - New data table
+- the final new data table contains the extra column new_date 
+```{r}
+new_tab_df$new_date<-tab_interval_sorted$date
+
+new_tab_df<-new_tab_df[order(new_tab_df$new_date),]
+```
+comparison tab and new_tab
+```{r}
+tab[1:20,]
+new_tab_df[1:20,]
+```
+
+###4 - Histogram
+- calculate the steps taken each day when NA filled in
+```{r}
+sum_steps_filledNA<-tapply(new_tab_df$steps,new_tab_df$new_date,sum) 
+```
+- make histogramm and display mean and median with summary()
+```{r}
+hist(sum_steps_filledNA,breaks=seq(0,25000,2500), xlim=c(0,25000),ylim=c(0,30), xlab=c("Steps"),
+     ylab=c("Frequency [Days]"), main=c(), plot=TRUE)
+
+summary(sum_steps_filledNA)
+```
+
+##Part 3: Are there differences in activity patterns between weekdays and weekends?
+- add a new column "weekday" to new_tab (with replaced NA) with the corresponding weekday to each date
+- split tab into weekend end: weekday == Saturday or Sunday and week != Saturday or Sunday
+- add a new comlum "day_type" to each new table
+- merge tables together again, to have a table with both week and weekend data, but use split tabes for calcuating means and to make the panel plot using the basic plotting system
+```{r} 
+head(new_tab_df)
+
+str(new_tab_df)
+new_tab_df$new_date<-as.Date(new_tab_df$new_date)
+new_tab_df$weekday<-weekdays(new_tab_df$new_date)
+
+weekend<-new_tab_df[new_tab_df[,"weekday"]=="Saturday"|new_tab_df[,"weekday"]=="Sunday",]
+weekend$day_type<-"weekend"
+
+week<-new_tab_df[new_tab_df[,"weekday"]!="Saturday"|new_tab_df[,"weekday"]!="Sunday",]
+week$day_type<-"weekday"
+
+new_with_daytype<-rbind(weekend,week)
+
+mean_steps_week<-tapply(week$steps,week$interval,mean)
+mean_steps_week_df<-data.frame(mean_steps_week)
+mean_steps_week_df$interval<-unique(week$interval)
+
+mean_steps_weekend<-tapply(weekend$steps,weekend$interval,mean)
+mean_steps_weekend_df<-data.frame(mean_steps_weekend)
+
+mean_steps_weekend_df$interval<-unique(weekend$interval)
+
+par(mfrow=c(2,1), oma=c(1,1,1,1))
+plot(mean_steps_week~interval, data=mean_steps_week_df, type="l",  xaxt="n",
+     ylim=c(0,200), main=c("Weekdays"),xlab=c("Time of day [h]"),ylab=c("Number of steps"))
+axis(1, at=c(0, 400, 800, 1200, 1600, 2000,2355),labels=c("00:00","4:00","8:00",
+                                                          "12:00","16:00","20:00",
+                                                          "23:55"))
+
+plot(mean_steps_weekend~interval, data=mean_steps_weekend_df, type="l", xaxt="n",
+     ylim=c(0,200), main=c("Weekends"),xlab=c("Time of day [h]"),
+     ylab=c("Number of steps"))
+axis(1, at=c(0, 400, 800, 1200, 1600, 2000,2355),labels=c("00:00","4:00","8:00",
+                                                          "12:00","16:00","20:00",
+                                                          "23:55"))
+
+```
+
